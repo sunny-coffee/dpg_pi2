@@ -28,7 +28,7 @@ criterion = torch.nn.MSELoss(reduction = 'mean')
 # Takes about 4 min to train
 for ep in range(total_episodes):
 
-    state = torch.tensor([[-10,0.2],[2,2]])
+    state = torch.tensor([[-10,0.2]])
 
     actions, cost = actor_model.predict_with_noise(state)
     # actions = torch
@@ -58,11 +58,11 @@ for ep in range(total_episodes):
     actions, cost = actor_model.predict_without_noise(state)
     ep_reward_list.append(cost)
     avg_reward = np.mean(ep_reward_list[-40:])
-    if ep%50 == 0:
-        print("Episode * {} * Avg Cost is ==> {}".format(ep, avg_reward))
+    # if ep%50 == 0:
+    print("Episode * {} * Avg Cost is ==> {}".format(ep, avg_reward))
     avg_reward_list.append(avg_reward)
 
 plt.plot(avg_reward_list)
 plt.xlabel("Episode")
-plt.ylabel("Avg. Epsiodic Reward")
+plt.ylabel("Avg. Epsiodic Cost")
 plt.show()

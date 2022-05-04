@@ -18,14 +18,14 @@ class Actor(nn.Module):
         # self.noise
         self.masspoint = Masspoint_one_step(1,1)
 
-        self.state2hidden1 = nn.Linear(state_size, state_size*4)
-        self.state2hidden2 = nn.Linear(state_size*4, hidden_size)
+        self.state2hidden1 = nn.Linear(state_size, hidden_size)
+        # self.state2hidden2 = nn.Linear(hidden_size*4, hidden_size)
 
-        self.grucell = nn.GRUCell (input_size=state_size, hidden_size=hidden_size, bias=True)
+        self.grucell = nn.RNNCell (input_size=state_size, hidden_size=hidden_size, bias=True)
 
-        self.output1 = nn.Linear(hidden_size, hidden_size)
-        self.output2 = nn.Linear(hidden_size, output_size)
-
+        self.output = nn.Linear(hidden_size, hidden_size)
+        self.output2refwd = nn.Linear(hidden_size, 2)
+        self.output2kp = nn.Linear(hidden_size, 2)
         # self.output2.weight.data.uniform_(-init_w, init_w)
         # self.output2.bias.data.uniform_(-init_w, init_w)
 
@@ -35,9 +35,9 @@ class Actor(nn.Module):
         #  action: (batch_size, action_size)
         #  actions: (src_len, batch_size, action_size)
         init_hidden = self.state2hidden1(init_state)
-        init_hidden = F.relu(init_hidden)
-        init_hidden = self.state2hidden2(init_hidden)
         hidden = F.relu(init_hidden)
+        # init_hidden = self.state2hidden2(init_hidden)
+        # hidden = F.relu(init_hidden)
 
         batch_size = init_state.size(0)
         actions = torch.zeros(self.n_steps, batch_size, self.action_size)
@@ -46,14 +46,22 @@ class Actor(nn.Module):
         ref_w = w
         for n in range(self.n_steps):
             hidden = self.step(ref_w, hidden)
-            output = self.output1(hidden)
+            output = self.output(hidden)
             output = F.relu(output)
-            output = self.output2(output)
-            ref_wd = output[:,0:2]
+
+            ref_wd = self.output2refwd(output)
+            ref_wd = F.tanh(ref_wd) * 2
+
+            kp = self.output2kp(output)
+            kp = F.sigmoid(kp) * 30
+
+            # output = self.output2kp(output)
+            # ref_wd = output[:,0:2]
+
             ref_w = ref_w + ref_wd * self.dt 
             # print(output)
-            kp =  output[:, 2:]
-            kp = torch.maximum(kp, torch.zeros_like(kp)) 
+            # kp =  output[:, 2:]
+            # kp = torch.maximum(kp, torch.zeros_like(kp)) 
             kd = 2*torch.sqrt(kp)
             force = 0
             action = kp * (ref_w-w) + kd * (ref_wd-wd)
@@ -82,39 +90,50 @@ class Actor(nn.Module):
         wdd_epoch = np.zeros((self.n_steps, batch_size, n_dim))
         control_parameter_epoch = np.zeros((self.n_steps, batch_size, n_dim_kp))
 
-        init_hidden = self.state2hidden1(init_state)
-        init_hidden = F.relu(init_hidden)
-        init_hidden = self.state2hidden2(init_hidden)
-        hidden = F.relu(init_hidden)
+        with torch.no_grad():
+            init_hidden = self.state2hidden1(init_state)
+            hidden = F.relu(init_hidden)
+            # init_hidden = self.state2hidden2(init_hidden)
+            # hidden = F.relu(init_hidden)
 
-        batch_size = init_state.size(0)
-        actions = torch.zeros(self.n_steps, batch_size, self.action_size)
-        w = init_state
-        wd = torch.zeros_like(w)
-        ref_w = w
-        for n in range(self.n_steps):
-            hidden = self.step(ref_w, hidden)
-            output = self.output1(hidden)
-            output = F.relu(output)
-            output = self.output2(output)
-            ref_wd = output[:,0:2]
-            ref_w = ref_w + ref_wd * self.dt 
-            # print(output)
-            kp =  output[:, 2:]
-            kp = torch.maximum(kp, torch.zeros_like(kp)) 
-            kd = 2*torch.sqrt(kp)
-            force = 0
-            action = kp * (ref_w-w) + kd * (ref_wd-wd)
-            action = (action + 0.1*torch.randn_like(action)).clip(-5, 5)
-            actions[n,:,:] = action
+            batch_size = init_state.size(0)
+            actions = torch.zeros(self.n_steps, batch_size, self.action_size)
+            w = init_state
+            wd = torch.zeros_like(w)
+            ref_w = w
+            for n in range(self.n_steps):
+                # hidden = self.step(ref_w, hidden)
+                # output = self.output1(hidden)
+                # output = F.relu(output)
+                # output = self.output2(output)
+                # ref_wd = output[:,0:2] 
+                # # print(output)
+                # kp =  output[:, 2:]
+                # kp = torch.maximum(kp, torch.zeros_like(kp)) 
+                hidden = self.step(ref_w, hidden)
+                output = self.output(hidden)
+                output = F.relu(output)
 
-            [w,wd,wdd] = self.masspoint.run_one_step(w,wd,action,force) 
-            w_epoch[n] = w.detach().numpy() 
-            wd_epoch[n] = wd.detach().numpy()  
-            wdd_epoch[n] = wdd.detach().numpy()  
-            control_parameter_epoch[n, :] = kp.detach().numpy() 
-        
-        totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
+                ref_wd = self.output2refwd(output)
+                ref_wd = F.tanh(ref_wd) * 2
+
+                kp = self.output2kp(output)
+                kp = F.sigmoid(kp) * 30
+
+                kd = 2*torch.sqrt(kp)
+                ref_w = ref_w + ref_wd * self.dt
+                force = 0
+                action = kp * (ref_w-w) + kd * (ref_wd-wd)
+                action = (action + 0.1*torch.randn_like(action)).clip(-5, 5)
+                actions[n,:,:] = action
+
+                [w,wd,wdd] = self.masspoint.run_one_step(w,wd,action,force) 
+                w_epoch[n] = w.detach().numpy() 
+                wd_epoch[n] = wd.detach().numpy()  
+                wdd_epoch[n] = wdd.detach().numpy()  
+                control_parameter_epoch[n, :] = kp.detach().numpy() 
+            print(w_epoch)
+            totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
 
         return actions, totCost
     
@@ -130,39 +149,49 @@ class Actor(nn.Module):
         wd_epoch = np.zeros((self.n_steps, batch_size, n_dim))
         wdd_epoch = np.zeros((self.n_steps, batch_size, n_dim))
         control_parameter_epoch = np.zeros((self.n_steps, batch_size, n_dim_kp))
+        with torch.no_grad():
+            init_hidden = self.state2hidden1(init_state)
+            hidden = F.relu(init_hidden)
+            # init_hidden = self.state2hidden2(init_hidden)
+            # hidden = F.relu(init_hidden)
 
-        init_hidden = self.state2hidden1(init_state)
-        init_hidden = F.relu(init_hidden)
-        init_hidden = self.state2hidden2(init_hidden)
-        hidden = F.relu(init_hidden)
+            batch_size = init_state.size(0)
+            actions = torch.zeros(self.n_steps, batch_size, self.action_size)
+            w = init_state
+            wd = torch.zeros_like(w)
+            ref_w = w
+            for n in range(self.n_steps):
+                # hidden = self.step(ref_w, hidden)
+                # output = self.output1(hidden)
+                # output = F.relu(output)
+                # output = self.output2(output)
+                # ref_wd = output[:,0:2] 
+                # # print(output)
+                # kp =  output[:, 2:]
+                # kp = torch.maximum(kp, torch.zeros_like(kp)) 
+                hidden = self.step(ref_w, hidden)
+                output = self.output(hidden)
+                output = F.relu(output)
 
-        batch_size = init_state.size(0)
-        actions = torch.zeros(self.n_steps, batch_size, self.action_size)
-        w = init_state
-        wd = torch.zeros_like(w)
-        ref_w = w
-        for n in range(self.n_steps):
-            hidden = self.step(ref_w, hidden)
-            output = self.output1(hidden)
-            output = F.relu(output)
-            output = self.output2(output)
-            ref_wd = output[:,0:2]
-            ref_w = ref_w + ref_wd * self.dt 
-            # print(output)
-            kp =  output[:, 2:]
-            kp = torch.maximum(kp, torch.zeros_like(kp)) 
-            kd = 2*torch.sqrt(kp)
-            force = 0
-            action = kp * (ref_w-w) + kd * (ref_wd-wd)
-            actions[n,:,:] = action
+                ref_wd = self.output2refwd(output)
+                ref_wd = F.tanh(ref_wd) * 2
 
-            [w,wd,wdd] = self.masspoint.run_one_step(w,wd,action,force) 
-            w_epoch[n] = w.detach().numpy() 
-            wd_epoch[n] = wd.detach().numpy()  
-            wdd_epoch[n] = wdd.detach().numpy()  
-            control_parameter_epoch[n, :] = kp.detach().numpy() 
+                kp = self.output2kp(output)
+                kp = F.sigmoid(kp) * 30
+
+                kd = 2*torch.sqrt(kp)
+                ref_w = ref_w + ref_wd * self.dt
+                force = 0
+                action = kp * (ref_w-w) + kd * (ref_wd-wd)
+                actions[n,:,:] = action
+
+                [w,wd,wdd] = self.masspoint.run_one_step(w,wd,action,force) 
+                w_epoch[n] = w.detach().numpy() 
+                wd_epoch[n] = wd.detach().numpy()  
+                wdd_epoch[n] = wdd.detach().numpy()  
+                control_parameter_epoch[n, :] = kp.detach().numpy() 
         
-        totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
+            totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
 
         return actions, totCost
 
@@ -206,9 +235,9 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, state_size:int, action_size:int, value_size:int, hidden_size:int=128):
         super(Critic, self).__init__()
-        self.state2hidden1 = nn.Linear(state_size, state_size*4)
-        self.state2hidden2 = nn.Linear(state_size*4, hidden_size)
-        self.grucell = nn.GRU(input_size=action_size, hidden_size=hidden_size, num_layers=1, bias=True, bidirectional=False)
+        self.state2hidden1 = nn.Linear(state_size, hidden_size)
+        # self.state2hidden2 = nn.Linear(state_size*4, hidden_size)
+        self.grucell = nn.RNN(input_size=action_size, hidden_size=hidden_size, num_layers=1, bias=True, bidirectional=False)
         self.output = nn.Linear(hidden_size, value_size)
 
     def forward(self, init_state: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
@@ -217,8 +246,8 @@ class Critic(nn.Module):
         #  actions: (src_len, batch_size, input_size)
         init_hidden = self.state2hidden1(init_state)
         init_hidden = F.relu(init_hidden)
-        init_hidden = self.state2hidden2(init_hidden)
-        init_hidden = F.relu(init_hidden)
+        # init_hidden = self.state2hidden2(init_hidden)
+        # init_hidden = F.relu(init_hidden)
 
         # print(actions.shape, init_hidden.shape)
         init_hidden = torch.unsqueeze(init_hidden, 0)
