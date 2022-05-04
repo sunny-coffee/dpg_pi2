@@ -55,10 +55,11 @@ for ep in range(total_episodes):
     actor_loss.backward()
     actor_optimizer.step()
 
+    actions, cost = actor_model.predict_without_noise(state)
     ep_reward_list.append(cost)
     avg_reward = np.mean(ep_reward_list[-40:])
     if ep%50 == 0:
-        print("Episode * {} * Avg Reward is ==> {}".format(ep, avg_reward))
+        print("Episode * {} * Avg Cost is ==> {}".format(ep, avg_reward))
     avg_reward_list.append(avg_reward)
 
 plt.plot(avg_reward_list)

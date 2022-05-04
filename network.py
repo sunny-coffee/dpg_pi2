@@ -117,6 +117,54 @@ class Actor(nn.Module):
         totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
 
         return actions, totCost
+    
+    def predict_without_noise(self, init_state: torch.Tensor) -> torch.Tensor:
+        """Forward method implementation."""
+        #  init_state: (batch_size, state_size)
+        #  action: (batch_size, action_size)
+        #  actions: (src_len, batch_size, action_size)
+        n_dim = config_DPG_PI2.n_dim
+        n_dim_kp = config_DPG_PI2.n_dim_kp
+        batch_size = init_state.shape[0]
+        w_epoch = np.zeros((self.n_steps, batch_size, n_dim))
+        wd_epoch = np.zeros((self.n_steps, batch_size, n_dim))
+        wdd_epoch = np.zeros((self.n_steps, batch_size, n_dim))
+        control_parameter_epoch = np.zeros((self.n_steps, batch_size, n_dim_kp))
+
+        init_hidden = self.state2hidden1(init_state)
+        init_hidden = F.relu(init_hidden)
+        init_hidden = self.state2hidden2(init_hidden)
+        hidden = F.relu(init_hidden)
+
+        batch_size = init_state.size(0)
+        actions = torch.zeros(self.n_steps, batch_size, self.action_size)
+        w = init_state
+        wd = torch.zeros_like(w)
+        ref_w = w
+        for n in range(self.n_steps):
+            hidden = self.step(ref_w, hidden)
+            output = self.output1(hidden)
+            output = F.relu(output)
+            output = self.output2(output)
+            ref_wd = output[:,0:2]
+            ref_w = ref_w + ref_wd * self.dt 
+            # print(output)
+            kp =  output[:, 2:]
+            kp = torch.maximum(kp, torch.zeros_like(kp)) 
+            kd = 2*torch.sqrt(kp)
+            force = 0
+            action = kp * (ref_w-w) + kd * (ref_wd-wd)
+            actions[n,:,:] = action
+
+            [w,wd,wdd] = self.masspoint.run_one_step(w,wd,action,force) 
+            w_epoch[n] = w.detach().numpy() 
+            wd_epoch[n] = wd.detach().numpy()  
+            wdd_epoch[n] = wdd.detach().numpy()  
+            control_parameter_epoch[n, :] = kp.detach().numpy() 
+        
+        totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
+
+        return actions, totCost
 
     def compute_cost(self, w, wd, wdd, control_parameter_epoch):
         # print(w.shape)
