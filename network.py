@@ -132,7 +132,7 @@ class Actor(nn.Module):
                 wd_epoch[n] = wd.detach().numpy()  
                 wdd_epoch[n] = wdd.detach().numpy()  
                 control_parameter_epoch[n, :] = kp.detach().numpy() 
-            print(w_epoch)
+            # print(w_epoch)
             totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
 
         return actions, totCost
