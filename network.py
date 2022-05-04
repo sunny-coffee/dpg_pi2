@@ -121,11 +121,11 @@ class Actor(nn.Module):
     def compute_cost(self, w, wd, wdd, control_parameter_epoch):
         # print(w.shape)
         # print(w[20,:])
-        # batch_size = w.shape[1]
+        batch_size = w.shape[1]
         # transCostSteps = np.zeros(self.n_steps, batch_size)
         # accelerationCostSteps = np.zeros(self.n_steps, batch_size)
         # stiffnessCostSteps = np.zeros(self.n_steps, batch_size)
-        viapointCost = 0
+        viapointCost = np.zeros(batch_size)
 
         # for n in range(self.n_steps):
             
@@ -134,10 +134,10 @@ class Actor(nn.Module):
         stiffnessCostSteps = np.linalg.norm(control_parameter_epoch, axis=2)
 
         for i in range(config_DPG_PI2.viapoints.shape[0]):
-            distances = np.linalg.norm(w - config_DPG_PI2.viapoints[i, :], axis=1)
-            minDist = np.min(distances)
+            distances = np.linalg.norm(w - config_DPG_PI2.viapoints[i, :], axis=2)
+            minDist = np.min(distances, axis=0)
             viapointCost += minDist
-        d_final  =  np.linalg.norm(w[-1, :] - config_DPG_PI2.goal)
+        d_final  =  np.linalg.norm(w[-1] - config_DPG_PI2.goal, axis=1)
         viapointCost += d_final
 
         viapointCostWeight = 1
