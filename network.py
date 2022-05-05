@@ -186,10 +186,10 @@ class Actor(nn.Module):
                 actions[n,:,:] = action
 
                 [w,wd,wdd] = self.masspoint.run_one_step(w,wd,action,force) 
-                w_epoch[n] = w.detach().numpy() 
-                wd_epoch[n] = wd.detach().numpy()  
-                wdd_epoch[n] = wdd.detach().numpy()  
-                control_parameter_epoch[n, :] = kp.detach().numpy() 
+                w_epoch[n] = w.numpy() 
+                wd_epoch[n] = wd.numpy()  
+                wdd_epoch[n] = wdd.numpy()  
+                control_parameter_epoch[n, :] = kp.numpy() 
         
             totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
 

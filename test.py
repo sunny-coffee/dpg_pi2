@@ -2,75 +2,34 @@ from masspoint import Masspoint_one_step
 import numpy as np
 from network import Actor, Critic
 import torch
+import matplotlib.pyplot as plt
 
-
-
-a = tensor([[16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1194],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1198],
-        [16.1198],
-        [16.1198],
-        [16.1194],
-        [16.1194],
-        [16.1198],
-        [16.1194],
-        [16.1194]])
-
-    
+# print(np.linspace(0,5,3))
+# print(np.arange(0,5))
+actor_model = torch.load('./model/actor_model.pt')
+w_list = []
+w = torch.tensor([[-10,0.2]])
+w_list.append(w.detach().numpy())
+ref_w = w
+wd = torch.tensor([[0,0]])
+hidden = actor_model.init_hidden(1)
+for i in range(120):
+    hidden, output = actor_model(w,hidden)
+    # print(output)
+    ref_wd = output[:, 0:2]
+    ref_w = ref_w + ref_wd * 0.1
+    kp = output[:, 2:]
+    kd = 2*torch.sqrt(kp)
+    action = kp * (ref_w-w) + kd * (ref_wd-wd)
+    wdd = (action - wd * 1 )/1
+    wd = wdd * 0.1 + wd
+    w = wd * 0.1 + w
+    w_list.append(w.detach().numpy())
+w_list = np.concatenate(w_list)
+print(w_list)
+plt.figure()
+plt.plot(w_list[:,0], w_list[:,1])
+plt.show()
 # rnn = torch.nn.RNNCell(2,4)
 # hidden = torch.zeros(2)
 # input = torch.zeros(4)

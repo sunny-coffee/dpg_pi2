@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 class Buffer:
-    def __init__(self, num_states, num_actions, n_steps, buffer_capacity=1000, batch_size=2):
+    def __init__(self, num_states, num_actions, n_steps, buffer_capacity=1000, batch_size=64):
         # Number of "experiences" to store at max
         self.buffer_capacity = buffer_capacity
         # Num of tuples to train on.
@@ -18,7 +18,7 @@ class Buffer:
         self.cost_buffer = np.zeros((self.buffer_capacity, 1))
         # self.next_state_buffer = np.zeros((self.buffer_capacity, num_states))
 
-    # Takes (s,a,r,s') obervation tuple as input
+    # Takes (s,actions,r) obervation tuple as input
     def record(self, obs_tuple):
         # Set index to zero if buffer_capacity is exceeded,
         # replacing old records
