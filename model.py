@@ -10,7 +10,6 @@ class Actor(nn.Module):
     def __init__(self, state_size:int, output_size:int, n_steps:int, hidden_size:int=128, init_w=0.003):
         """Initialize."""
         super(Actor, self).__init__()
-
         self.dt = 0.1
         self.n_steps = n_steps
         self.output_size = output_size
@@ -31,6 +30,7 @@ class Actor(nn.Module):
         self.output2refwd.bias.data.uniform_(-init_w, init_w)
         self.output2kp.weight.data.uniform_(-init_w, init_w)
         self.output2kp.bias.data.uniform_(-init_w, init_w)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def forward(self, state:torch.Tensor, hidden:torch.Tensor) -> torch.Tensor:
         """Forward method implementation."""
@@ -62,7 +62,7 @@ class Critic(nn.Module):
         # self.state2hidden2 = nn.Linear(state_size*4, hidden_size)
         self.grucell = nn.RNN(input_size=action_size, hidden_size=hidden_size, num_layers=1, bias=True, bidirectional=False)
         self.output = nn.Linear(hidden_size, value_size)
-
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     def forward(self, init_state: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
         """Forward method implementation."""
         #  init_state: (batch_size,state_size)

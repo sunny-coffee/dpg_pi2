@@ -11,6 +11,8 @@ from torch.utils.data import DataLoader
 from masspoint_DPG import Masspoint
 from configurations import config_DPG_PI2
 
+# actor_model = Actor(2,4,120)
+# actor_model.to(actor_model.device)
 # actor_pretrain_criterion = torch.nn.MSELoss(reduction = 'mean')
 # actor_pretrain_optimizer = torch.optim.Adam(actor_model.parameters(),lr=0.001)
 
@@ -22,6 +24,8 @@ from configurations import config_DPG_PI2
 # # print(dataset[0])
 # train_loader = DataLoader(dataset=dataset, batch_size=2, shuffle=True)
 
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# actor_model.to(device)
 # # plt.figure()
 # loss_list = []
 # for epoch in range(100):
@@ -34,13 +38,17 @@ from configurations import config_DPG_PI2
 #         target = np.transpose(target,(1,0,2))
 #         state = state.to(torch.float32)
 #         target = target.to(torch.float32)
+
+#         state, target = state.to(device), target.to(device)
+
 #         batch_size = state.shape[1]
 # #         for i in range(batch_size):
 # #             plt.plot(state[:,i,0], state[:,i,1])
 # # plt.show()
 #         loss=0
 #         actor_pretrain_optimizer.zero_grad()
-#         hidden = actor_model.init_hidden(batch_size)
+#         hidden = actor_model.init_hidden(batch_size).to(device)
+
 #         # print(state.shape, target.shape)
 #         outputs = []
 #         for input,label in zip(state,target):
@@ -60,9 +68,13 @@ from configurations import config_DPG_PI2
 # torch.save(actor_model, './model/actor_model.pt')
 
 
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 actor_model = torch.load('./model/actor_model.pt')
+actor_model.to(actor_model.device)
+
 critic_model = Critic(2, 2, 1)
+critic_model.to(critic_model.device)
+
 masspoint = Masspoint(1,1,config_DPG_PI2)
 # Learning rate for actor-critic models
 critic_lr = 0.0002
@@ -96,6 +108,9 @@ for ep in range(total_episodes):
 
     state_batch, actions_batch, cost_batch = buffer.sample()
 
+    state_batch = state_batch.to(device)
+    actions_batch = actions_batch.to(device)
+    cost_batch = cost_batch.to(device)
     # print(state_batch.shape)
     # print(actions_batch.shape)
     current_cost_batch = critic_model(state_batch, actions_batch)

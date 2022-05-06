@@ -28,10 +28,10 @@ class Masspoint():
 
         with torch.no_grad():
             actions = torch.zeros(self.n_steps, batch_size, self.action_size)
-            w = init_state
-            wd = torch.zeros_like(w)
-            ref_w = w
-            hidden = actor_model.init_hidden(batch_size)
+            w = init_state.to(actor_model.device)
+            wd = torch.zeros_like(w).to(actor_model.device)
+            ref_w = w.to(actor_model.device)
+            hidden = actor_model.init_hidden(batch_size).to(actor_model.device)
             for n in range(self.n_steps):
                 hidden, output = actor_model(ref_w, hidden)
                 ref_wd = output[:, 0:2]
@@ -45,10 +45,10 @@ class Masspoint():
                 actions[n,:,:] = action
 
                 [w,wd,wdd] = self.run_one_step(w,wd,action,force) 
-                w_epoch[n] = w.numpy() 
-                wd_epoch[n] = wd.numpy()  
-                wdd_epoch[n] = wdd.numpy()  
-                control_parameter_epoch[n, :] = kp.numpy() 
+                w_epoch[n] = w.cpu().numpy() 
+                wd_epoch[n] = wd.cpu().numpy()  
+                wdd_epoch[n] = wdd.cpu().numpy()  
+                control_parameter_epoch[n, :] = kp.cpu().numpy() 
             
             totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
         return actions, totCost
@@ -56,10 +56,10 @@ class Masspoint():
     def run_all_steps(self, init_state, actor_model):
         batch_size = init_state.shape[0]
         actions = torch.zeros(self.n_steps, batch_size, self.action_size)
-        w = init_state
-        wd = torch.zeros_like(w)
-        ref_w = w
-        hidden = actor_model.init_hidden(batch_size)
+        w = init_state.to(actor_model.device)
+        wd = torch.zeros_like(w).to(actor_model.device)
+        ref_w = w.to(actor_model.device)
+        hidden = actor_model.init_hidden(batch_size).to(actor_model.device)
         for n in range(self.n_steps):
             hidden, output = actor_model(ref_w, hidden)
             ref_wd = output[:, 0:2]
@@ -70,7 +70,7 @@ class Masspoint():
             action = kp * (ref_w-w) + kd * (ref_wd-wd)
             actions[n,:,:] = action
             [w,wd,wdd] = self.run_one_step(w,wd,action,force)
-        return actions
+        return actions.to(actor_model.device)
 
     
     def test_all_steps(self, init_state, actor_model):
@@ -81,10 +81,10 @@ class Masspoint():
         control_parameter_epoch = np.zeros((self.n_steps, batch_size, self.n_dim_kp))
         
         with torch.no_grad():
-            w = init_state
-            wd = torch.zeros_like(w)
-            ref_w = w
-            hidden = actor_model.init_hidden(batch_size)
+            w = init_state.to(actor_model.device).to(actor_model.device)
+            wd = torch.zeros_like(w).to(actor_model.device)
+            ref_w = w.to(actor_model.device)
+            hidden = actor_model.init_hidden(batch_size).to(actor_model.device)
             for n in range(self.n_steps):
                 hidden, output = actor_model(ref_w, hidden)
                 ref_wd = output[:, 0:2]
@@ -94,10 +94,10 @@ class Masspoint():
                 force = 0
                 action = kp * (ref_w-w) + kd * (ref_wd-wd)
                 [w,wd,wdd] = self.run_one_step(w,wd,action,force) 
-                w_epoch[n] = w.numpy() 
-                wd_epoch[n] = wd.numpy()  
-                wdd_epoch[n] = wdd.numpy()  
-                control_parameter_epoch[n, :] = kp.numpy() 
+                w_epoch[n] = w.cpu().numpy() 
+                wd_epoch[n] = wd.cpu().numpy()  
+                wdd_epoch[n] = wdd.cpu().numpy()  
+                control_parameter_epoch[n, :] = kp.cpu().numpy() 
             totCost, transCost, viapointCost, accelerationCost, stiffnessCost = self.compute_cost(w_epoch, wd_epoch, wdd_epoch, control_parameter_epoch)
         return totCost
     
