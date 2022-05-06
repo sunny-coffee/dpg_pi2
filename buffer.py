@@ -43,3 +43,10 @@ class Buffer:
         cost_batch = torch.from_numpy(np.float32(self.cost_buffer[batch_indices]))
 
         return state_batch, actions_batch, cost_batch
+
+    def save_data(self):
+        np.save('./data/state', self.state_buffer[0:self.buffer_counter])
+        np.save('./data/actions', self.actions_buffer[0:self.buffer_counter])
+        np.save('./data/cost', self.cost_buffer[0:self.buffer_counter])
+        print(self.buffer_counter)
+    

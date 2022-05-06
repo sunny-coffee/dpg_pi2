@@ -1,3 +1,4 @@
+from cmath import inf
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -77,7 +78,7 @@ critic_model.to(critic_model.device)
 
 masspoint = Masspoint(1,1,config_DPG_PI2)
 # Learning rate for actor-critic models
-critic_lr = 0.0002
+critic_lr = 0.002
 actor_lr = 0.00001
 
 critic_optimizer = torch.optim.Adam(critic_model.parameters(), lr = critic_lr)
@@ -90,7 +91,7 @@ ep_reward_list = []
 avg_reward_list = []
 
 
-total_episodes = 200
+total_episodes = 20000
 criterion = torch.nn.MSELoss(reduction = 'mean')
 # Takes about 4 min to train
 for ep in range(total_episodes):
@@ -98,28 +99,23 @@ for ep in range(total_episodes):
     state = torch.tensor([[-10,0.2]])
 
     # actions, cost = actor_model.predict_with_noise(state)
+    # for rep in range(10):
     actions, cost = masspoint.run_all_steps_with_noise(state,actor_model)
-    # actions = torch
-    # print(actions)
-    # print(cost)
-    # print(state.shape, actions.shape, cost.shape)
     buffer.record((state, actions, cost))
 
-
     state_batch, actions_batch, cost_batch = buffer.sample()
-
     state_batch = state_batch.to(device)
     actions_batch = actions_batch.to(device)
     cost_batch = cost_batch.to(device)
-    # print(state_batch.shape)
-    # print(actions_batch.shape)
-    current_cost_batch = critic_model(state_batch, actions_batch)
-    # print(current_cost_batch)
-    # print(cost_batch)
-    critic_loss = criterion(current_cost_batch, cost_batch)
-    critic_optimizer.zero_grad()
-    critic_loss.backward()
-    critic_optimizer.step()
+
+    critic_loss = inf
+    while critic_loss > 0.02:
+        current_cost_batch = critic_model(state_batch, actions_batch)
+        critic_loss = criterion(current_cost_batch, cost_batch)
+        critic_optimizer.zero_grad()
+        critic_loss.backward()
+        critic_optimizer.step()
+        # print(critic_loss.item())
 
     actor_loss = critic_model(state_batch, masspoint.run_all_steps(state_batch,actor_model)).mean()
     actor_optimizer.zero_grad()
@@ -132,6 +128,7 @@ for ep in range(total_episodes):
     if ep%20 == 0:
         print("Episode * {} *  Cost is ==> {}".format(ep, cost))
 
+buffer.save_data()
 plt.plot(ep_reward_list)
 plt.xlabel("Episode")
 plt.ylabel("Epsiodic Cost")
